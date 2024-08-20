@@ -86,7 +86,7 @@
   "perm-item-drop-description": "Eşya düşürebilmek",
   "perm-manage-name": "Alanı yönetmek",
   "perm-manage-description": "Alan yetkilerini yönetebilmek",
-  "perm-delete-name": "Alanı simek",
+  "perm-delete-name": "Alanı silmek",
   "perm-delete-description": "Alanı silebilme yetkisi",
   "gui-name": "XClaim",
   "gui-main-new": "<gold>Yeni Alan</gold>",
