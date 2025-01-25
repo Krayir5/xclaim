@@ -69,34 +69,47 @@ For instance, if you wanted to set the default price for a claim to 2.25, then y
 See all options in the [config section](#config).
 
 ## Config
-| Name | Description | Default Value |
-| --: | :-: | :-- |
-| language | The language to use, must be a valid language pack from ``/plugins/XClaim/lang`` otherwise falls back to en-US | en-US |
-| veteran-time | The time in seconds it takes for a player to be on the server in order for Veteran status to take effect | 604800 (1 week) |
-| stop-editing-on-shutdown | Whether players should be booted out of the chunk editor on shutdown | false |
-| stop-editing-on-leave | Whether players should be booted out of the chunk editor when they leave voluntarily | true |
-| exempt-claim-owner-from-permission-rules | If claim owners should have access to all permissions on the claim implicitly. You shouldn't change this, it's mainly for debugging | true |
-| enforce-adjacent-claim-chunks | Whether chunks in a claim must be next to each other | true |
-| allow-diagonal-claim-chunks | If enforce-adjacent-claim-chunks is true, this sets if chunks diagonal from each other are considered as "next to" each other. Otherwise, does nothing. | true |
-| claim-min-distance | If greater than 0, determines the minimum distance between chunks claimed by different players | 0 |
-| enter-chunk-editor-on-create | If true, then players will enter the chunk editor when they make a new claim | true |
-| use-economy | Whether to use economy features | false |
-| limits.𝘨𝘳𝘰𝘶𝘱-𝘯𝘢𝘮𝘦.max-chunks | Sets the max chunks for a group. See Permissions for more info. | |
-| limits.𝘨𝘳𝘰𝘶𝘱-𝘯𝘢𝘮𝘦.max-claims | Sets the max claims for a group. See Permissions for more info. | |
-| limits.𝘨𝘳𝘰𝘶𝘱-𝘯𝘢𝘮𝘦.give-after | The time in seconds it takes for a player to play until they are automatically entered into this group. Values less than 0 signify "never". | -1 |
-| limits.𝘨𝘳𝘰𝘶𝘱-𝘯𝘢𝘮𝘦.claim-price | If economy is enabled, sets the price for claiming a chunk. | 20 |
-| limits.𝘨𝘳𝘰𝘶𝘱-𝘯𝘢𝘮𝘦.unclaim-reward | If economy is enabled, sets the refund amount for unclaiming a chunk. | 0 |
-| limits.𝘨𝘳𝘰𝘶𝘱-𝘯𝘢𝘮𝘦.free-chunks | If economy is enabled, sets the amount of chunks a player can claim for free before the next chunk requires a payment of ``limits.𝘨𝘳𝘰𝘶𝘱-𝘯𝘢𝘮𝘦.claim-price``. | 4 |
-| limits.𝘨𝘳𝘰𝘶𝘱-𝘯𝘢𝘮𝘦.max-claims-in-world | The maximum number of claims allowed at a time in each world. Values less than 1 signify no limit. | -1 |
-| dynmap-integration.enabled | If true, XClaim will look for dynmap on startup and hook into it. Mild speedup if turned off. | true |
-| dynmap-integration.use-old-outline-style | If true, the dynmap will use the old convex hull outlines on claims. This is mainly for debugging, as the new outline system is experimental. | false |
-| disable-paper-warning | Disables the message posted to console on startup when the server is running Spigot instead of Paper | false |
-| worlds.use-whitelist | If worlds.whitelist should be considered | false |
-| worlds.use-blacklist | If worlds.blacklist should be considered | false |
-| worlds.case-sensitive | Whether capitalization in world names in the white/blacklist matter | true |
-| worlds.whitelist | A list that a world must be in for it to work with XClaim | a sample list |
-| worlds.blacklist | A list that a world must NOT be in for it to work with XClaim | a sample list |
-| worlds.grace-time | If a claim is in a disallowed world, players have this much time in seconds before the claim is automatically removed | 604800 (1 week) |
+Configuration is now handled by [``config.toml``](https://github.com/WasabiThumb/xclaim/blob/master/src/main/resources/config.toml), which is fairly self-explanatory.
+Support for the [legacy YAML config](https://github.com/WasabiThumb/xclaim/blob/00823def93261519b8ca836a1a774a5a1f81ce65/README.md#config) may be removed in the future.
+
+**If both formats are present, [``config.yml``](https://github.com/WasabiThumb/xclaim/blob/00823def93261519b8ca836a1a774a5a1f81ce65/src/main/resources/config.yml) will be used.**
+
+### Config (GUI Layouts)
+**This only applies for ``config.toml`` with ``gui.version`` set to 2.**
+
+After running once, the ``layouts`` directory will appear in the XClaim configuration root. This will give access to GUI
+layout files (e.g. ``layouts/main.xml``). A typical application for editing the layouts would be to remove a button from the GUI. For instance, if you wanted to remove the ability to modify the ``ENTER`` permission, then change ``layouts/permission-list.xml``:
+
+```diff
+    <slot id="2"/>  <!-- BREAK -->
+-   <slot id="3"/>  <!-- ENTER -->
++   <!-- <slot id="3"/> --> <!-- ENTER -->
+    <slot id="4"/>  <!-- INTERACT -->
+```
+
+The format is not very friendly, but an attempt will be made to document it here:
+
+|          Tag |              Allowed Properties               | Description                                                                                                                                                                                                  |
+|-------------:|:---------------------------------------------:|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| ``<layout>`` |                   - none -                    | The document root. No other tags should be placed at top-level, including metadata.                                                                                                                          |
+|    ``<row>`` |    ``id``, ``x``, ``y``, ``w``, ``basis``     | Automatically adjusts the X position of each child element according to either the ``basis`` set in the config or the ``basis`` set on the tag. If an ``id`` is specified, it should have no child elements. |
+|   ``<slot>`` |             ``id``, ``x``, ``y``              | Marks a location where XClaim can insert an item. Must have an ``id`` and must have no child elements.                                                                                                       |
+|   ``<area>`` | ``id``, ``x``, ``y``, ``w``, ``h``, ``basis`` | Marks a location where XClaim can insert multiple (in excess of 9) items. Must have an ``id`` and must have no child elements. Mainly used for paginated content.                                            |
+
+
+|  Property | Description                                                                                                                                                                                                                                                                              |
+|----------:|:-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+|    ``id`` | Binds the element to a slot in the code. If the spec wishes to place an item at ID ``0``, it will end up located at the ``x`` and ``y`` position of the element with ``id="0"``.                                                                                                         |
+|     ``x`` | Sets the ``x`` position of the element. Must be between ``0`` and ``CONTAINER_WIDTH - 1`` (denoted as ``~``[†](#tilda-syntax)). If not specified, the element inherits the ``x`` position of its container.                                                                              |
+|     ``y`` | Sets the ``y`` position of the element. Must be between ``0`` and ``CONTAINER_HEIGHT - 1`` (denoted as ``~``[†](#tilda-syntax)). If not specified, the element inherits the ``y`` position of its container.                                                                             |
+|     ``w`` | Sets the width of the element. Must be between ``1`` and ``CONTAINER_WIDTH`` (denoted as ``~``[†](#tilda-syntax)). If not specified, the width is the default width for that element. For instance, ``<row>`` is width ``~`` by default, and ``<slot>`` is width ``1`` by default.       |
+|     ``h`` | Sets the width of the element. Must be between ``1`` and ``CONTAINER_HEIGHT`` (denoted as ``~``[†](#tilda-syntax)). If not specified, the height is the default height for that element. For instance, ``<area>`` is height ``~`` by default, and ``<slot>`` is height ``1`` by default. |
+| ``basis`` | The default horizontal alignment of slots within this element. Must be one of ``LEFT``, ``RIGHT``, ``CENTER`` or ``EVEN``.                                                                                                                                                               |
+
+#### Tilda Syntax
+The symbol ``~`` when applied to a numeric value indicates the maximum value that is within bounds. A number placed
+after the symbol subtracts from the maximum, for instance ``~1`` is one less than the maximum and ``~2`` is two less than the maximum.
+
 
 ## Permissions
 Don't worry, there aren't that many.

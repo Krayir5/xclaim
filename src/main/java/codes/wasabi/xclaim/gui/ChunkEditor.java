@@ -7,6 +7,7 @@ import codes.wasabi.xclaim.api.enums.Permission;
 import codes.wasabi.xclaim.api.event.XClaimAddChunkToClaimEvent;
 import codes.wasabi.xclaim.api.event.XClaimEvent;
 import codes.wasabi.xclaim.api.event.XClaimRemoveChunkFromClaimEvent;
+import codes.wasabi.xclaim.config.struct.sub.RulesConfig;
 import codes.wasabi.xclaim.economy.Economy;
 import codes.wasabi.xclaim.particle.ParticleBuilder;
 import codes.wasabi.xclaim.particle.ParticleEffect;
@@ -22,9 +23,7 @@ import org.bukkit.*;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.HumanEntity;
 import org.bukkit.entity.Player;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.EventPriority;
-import org.bukkit.event.Listener;
+import org.bukkit.event.*;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
@@ -49,6 +48,29 @@ public class ChunkEditor {
             PlatformItemPickupListener listener = Platform.get().getItemPickupListener();
             listener.on(this::onPickup);
             listener.register();
+        }
+
+        void tryRegisterConditionalEvents() {
+            // Register events that are not guaranteed to exist in Spigot 1.8+
+            final String[] miscPlayerEvents = new String[] {
+                    "io.papermc.paper.event.player.PlayerItemFrameChangeEvent",
+                    "org.bukkit.event.player.PlayerArmorStandManipulateEvent"
+            };
+            for (String className : miscPlayerEvents) {
+                try {
+                    this.registerMiscPlayerEvent(Class.forName(className).asSubclass(PlayerEvent.class));
+                } catch (ClassNotFoundException | ClassCastException ignored) { }
+            }
+        }
+
+        private void registerMiscPlayerEvent(@NotNull Class<? extends PlayerEvent> clazz) {
+            Bukkit.getPluginManager().registerEvent(
+                    clazz,
+                    this,
+                    EventPriority.NORMAL,
+                    (Listener ignored, Event event) -> this.onMiscPlayerEvent((PlayerEvent) event),
+                    XClaim.instance
+            );
         }
 
         @EventHandler
@@ -162,8 +184,9 @@ public class ChunkEditor {
                             Platform.getAdventure().player(ply).sendMessage(XClaim.lang.getComponent("chunk-editor-min-distance-deny"));
                             break;
                         }
-                        if (XClaim.mainConfig.getBoolean("enforce-adjacent-claim-chunks", true)) {
-                            boolean diagonals = XClaim.mainConfig.getBoolean("allow-diagonal-claim-chunks", true);
+                        final RulesConfig.PlacementRule placementRule = XClaim.mainConfig.rules().placement();
+                        if (placementRule != RulesConfig.PlacementRule.NONE) {
+                            boolean diagonals = placementRule == RulesConfig.PlacementRule.NEIGHBOR;
                             boolean nextTo = false;
                             int targetX = chunk.getX();
                             int targetZ = chunk.getZ();
@@ -292,9 +315,15 @@ public class ChunkEditor {
         }
 
         @EventHandler
+        public void onInteractEntity(@NotNull PlayerInteractEntityEvent event) {
+            Player ply = event.getPlayer();
+            if (getEditing(ply) != null) event.setCancelled(true);
+        }
+
+        @EventHandler
         public void onLeave(@NotNull PlayerQuitEvent event) {
             Player ply = event.getPlayer();
-            if (XClaim.mainConfig.getBoolean("stop-editing-on-leave", true)) {
+            if (XClaim.mainConfig.editor().stopOnLeave()) {
                 stopEditing(ply);
             }
         }
@@ -401,6 +430,13 @@ public class ChunkEditor {
             }
         }
 
+        public void onMiscPlayerEvent(@NotNull PlayerEvent event) {
+            Player ply = event.getPlayer();
+            if (getEditing(ply) != null && event instanceof Cancellable) {
+                ((Cancellable) event).setCancelled(true);
+            }
+        }
+
     }
 
     private static ItemStack CLAIM_STACK;
@@ -428,6 +464,7 @@ public class ChunkEditor {
         KEY_INVENTORY = Objects.requireNonNull(Platform.get().createNamespacedKey(XClaim.instance, "ce_inventory"));
         EVENTS = new Events();
         Bukkit.getPluginManager().registerEvents(EVENTS, XClaim.instance);
+        EVENTS.tryRegisterConditionalEvents();
     }
 
     private static final Map<UUID, Claim> editingMap = new HashMap<>();
@@ -489,7 +526,7 @@ public class ChunkEditor {
     }
 
     public static boolean violatesDistanceCheck(Player owner, Chunk chunk) {
-        double minDistance = XClaim.mainConfig.getDouble("claim-min-distance", 0d);
+        double minDistance = XClaim.mainConfig.rules().minDistance();
         if (minDistance < 1d) return false;
         if (minDistance > 16d) {
             // TODO: Maybe generate a warning here? Checking over 256 chunks just to honor a (probably mistakenly) bad config seems dicey.
